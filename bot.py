@@ -18,7 +18,7 @@ from datetime import datetime
 # TOKEN
 #==========================
 
-TOKEN = "DÁN_TOKEN_MỚI_CỦA_BẠN_VÀO_ĐÂY"
+TOKEN = "8637437061:AAGM-gbf9YXjfixLszRU0lsdLbDOFTx6v_k"
 
 #==========================
 # DATABASE
@@ -280,4 +280,26 @@ async def handle(
     await update.message.reply_text(
         "请选择菜单。"
     )
-  
+  #==========================
+# RUN BOT
+#==========================
+
+app = Application.builder().token(TOKEN).build()
+
+app.add_handler(
+    CommandHandler(
+        "start",
+        start
+    )
+)
+
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle
+    )
+)
+
+print("Bot Running...")
+
+app.run_polling()
