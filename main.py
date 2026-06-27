@@ -162,7 +162,7 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
                     work_minutes = int((off_dt - on_dt).total_seconds() // 60)
                     work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
 
-msg += (
+            msg += (
     f"👤 {user_data.get('name', '用户')}\n"
     f"🕘 上班：{on_text}\n"
     f"🕕 下班：{off_text}\n"
@@ -174,8 +174,11 @@ msg += (
     f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
 )
 
-for group_id in GROUP_IDS:
-    await context.bot.send_message(chat_id=group_id, text=msg)
+    for group_id in GROUP_IDS:
+            await context.bot.send_message(
+            chat_id=group_id,
+            text=msg
+        )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
