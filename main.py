@@ -160,7 +160,9 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
                     off_dt = datetime.fromisoformat(user_data["off"])
                     off_text = off_dt.strftime("%H:%M:%S")
                     work_minutes = int((off_dt - on_dt).total_seconds() // 60)
-                    work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"msg += (
+                    work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
+
+msg += (
                 f"👤 {user_data.get('name', '用户')}\n"
                 f"🕘 上班：{on_text}\n"
                 f"🕕 下班：{off_text}\n"
@@ -278,7 +280,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if user_data.get("on"):
             on_dt = datetime.fromisoformat(user_data["on"])
-            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")if user_data.get("off"):
+            on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+if user_data.get("off"):
                 off_dt = datetime.fromisoformat(user_data["off"])
                 off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
                 work_minutes = int((off_dt - on_dt).total_seconds() // 60)
