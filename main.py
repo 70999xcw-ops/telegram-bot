@@ -172,13 +172,10 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
     f"📌 其他：{user_data.get('other', 0)}分钟\n"
     f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
-)
+            )
 
     for group_id in GROUP_IDS:
-            await context.bot.send_message(
-            chat_id=group_id,
-            text=msg
-        )
+        await context.bot.send_message(chat_id=group_id, text=msg)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -287,10 +284,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
 
         if user_data.get("off"):
-                off_dt = datetime.fromisoformat(user_data["off"])
-                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
-                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
-                work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
+            off_dt = datetime.fromisoformat(user_data["off"])
+            off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
+            work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+            work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
 
         await update.message.reply_text(
             f"📊 今日统计\n\n"
@@ -300,8 +297,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🕒 工时：{work_text}\n\n"
             f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
             f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-f"📌 其他：{user_data.get('other', 0)}分钟\n"
+                        f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+            f"📌 其他：{user_data.get('other', 0)}分钟\n"
             f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
