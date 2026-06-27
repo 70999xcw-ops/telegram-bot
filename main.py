@@ -173,7 +173,6 @@ msg += (
     f"📌 其他：{user_data.get('other', 0)}分钟\n"
     f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
 )
-            )
 
     for group_id in GROUP_IDS:
         await context.bot.send_message(chat_id=group_id, text=msg)
