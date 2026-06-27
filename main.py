@@ -174,8 +174,8 @@ msg += (
     f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
 )
 
-    for group_id in GROUP_IDS:
-        await context.bot.send_message(chat_id=group_id, text=msg)
+for group_id in GROUP_IDS:
+    await context.bot.send_message(chat_id=group_id, text=msg)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
