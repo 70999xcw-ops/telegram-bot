@@ -12,8 +12,8 @@ BJ_TZ = ZoneInfo("Asia/Shanghai")
 DATA_FILE = "data.json"
 
 GROUP_IDS = [
-    -1002261583659,
-    -1002212346327
+    -1003937059366,
+   
 ]
 
 keyboard = ReplyKeyboardMarkup(
