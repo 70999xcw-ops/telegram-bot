@@ -38,7 +38,7 @@ def load_data():
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
@@ -303,6 +303,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=keyboard
         )
 
+
+
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN environment variable is not set")
 
 app = Application.builder().token(TOKEN).build()
 
