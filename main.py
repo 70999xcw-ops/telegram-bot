@@ -231,10 +231,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await go_away(update, context, "meal", "吃饭", 30)
 
     elif text == "上厕所/wc":
-        await go_away(update, context, "toilet", "上厕所", 10)
+        await go_away(update, context, "toilet", "上厕所", 12)
 
     elif text == "抽烟/smoke":
-        await go_away(update, context, "smoke", "抽烟", 10)
+        await go_away(update, context, "smoke", "抽烟", 15)
 
     elif text == "其他":
         await go_away(update, context, "other", "其他", 10)
