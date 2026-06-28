@@ -62,6 +62,7 @@ def init_user(data, day, uid, name):
         "toilet": 0,
         "smoke": 0,
         "other": 0,
+        "other_count": 0,
         "back": 0,
         "away": None
     })
@@ -237,6 +238,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await go_away(update, context, "smoke", "抽烟", 15)
 
     elif text == "其他":
+        if data[day][uid].get("other_count", 0) >= 2:
+            await update.message.reply_text(
+                "❌ 今天『其他』只能使用2次。",
+                reply_markup=keyboard
+            )
+            return
+
+        data[day][uid]["other_count"] += 1
+        save_data(data)
+
         await go_away(update, context, "other", "其他", 20)
 
     elif text == "回坐/back":
@@ -326,7 +337,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
             f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
                         f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-            f"📌 其他：{user_data.get('other', 0)}分钟\n"
+            f"📌 其他：{user_data.get('other', 0)}分钟（{user_data.get('other_count',0)}/2次）\n"
             f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
