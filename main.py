@@ -237,7 +237,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await go_away(update, context, "smoke", "抽烟", 15)
 
     elif text == "其他":
-        await go_away(update, context, "other", "其他", 10)
+        await go_away(update, context, "other", "其他", 15)
 
     elif text == "回坐/back":
         away = data[day][uid].get("away")
