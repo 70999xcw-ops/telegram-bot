@@ -87,7 +87,7 @@ async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     away = data.get(day, {}).get(uid, {}).get("away")
 
-    if not away:
+    if away is None:
         return
 
     await context.bot.send_message(
@@ -246,7 +246,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
             job.schedule_removal()
 
-        if not away:
+        if away is None:
             save_data(data)
             await update.message.reply_text(
                 f"✅ 回坐成功\n"
@@ -263,28 +263,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data(data)
 
         if actual_minutes <= allowed:
-    msg = (
-        "✅ 准时回坐\n\n"
-        f"👤 {name}\n"
-        f"📌 类型：{away['label']}\n"
-        f"⏱ 实际离开：{actual_minutes}分钟\n"
-        f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-else:
-    overtime = actual_minutes - allowed
-    msg = (
-        "⚠️ 超时回坐\n\n"
-        f"👤 {name}\n"
-        f"📌 类型：{away['label']}\n"
-        f"⏱ 实际离开：{actual_minutes}分钟\n"
-        f"⌛ 超时：{overtime}分钟\n"
-        f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
+            msg = (
+                "✅ 准时回坐\n\n"
+                f"👤 {name}\n"
+                f"📌 类型：{away['label']}\n"
+                f"⏱ 实际离开：{actual_minutes}分钟\n"
+                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        else:
+            overtime = actual_minutes - allowed
+            msg = (
+                "⚠️ 超时回坐\n\n"
+                f"👤 {name}\n"
+                f"📌 类型：{away['label']}\n"
+                f"⏱ 实际离开：{actual_minutes}分钟\n"
+                f"⌛ 超时：{overtime}分钟\n"
+                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
-await update.message.reply_text(
-    msg,
-    reply_markup=keyboard
-)
+        await update.message.reply_text(
+            msg,
+            reply_markup=keyboard
+        )
 
     elif text == "统计/report":
         user_data = data[day][uid]
