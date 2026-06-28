@@ -13,7 +13,7 @@ DATA_FILE = "data.json"
 
 GROUP_IDS = [
     -1003937059366,
-   
+    -5424509783,
 ]
 
 keyboard = ReplyKeyboardMarkup(
