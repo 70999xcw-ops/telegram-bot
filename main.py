@@ -240,8 +240,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await go_away(update, context, "other", "其他", 20)
 
     elif text == "回坐/back":
+        work_day = day
         away = data[day][uid].get("away")
-        data[day][uid]["back"] += 1
+
+        if away is None:
+            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+            if uid in data.get(yesterday, {}):
+                old_away = data[yesterday][uid].get("away")
+                if old_away:
+                    work_day = yesterday
+                    away = old_away
+
+        data[work_day][uid]["back"] += 1
 
         for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
             job.schedule_removal()
@@ -249,8 +259,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if away is None:
             save_data(data)
             await update.message.reply_text(
-                f"✅ 回坐成功\n"
-                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
+                "❌ 未找到离开记录\n\n"
+                "请先点击：\n"
+                "🍚 吃饭/meal\n"
+                "🚽 上厕所/wc\n"
+                "🚬 抽烟/smoke\n"
+                "📌 其他",
                 reply_markup=keyboard
             )
             return
@@ -259,7 +273,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         actual_minutes = int((now - start).total_seconds() // 60)
         allowed = away.get("mins", 0)
 
-        data[day][uid]["away"] = None
+        data[work_day][uid]["away"] = None
         save_data(data)
 
         if actual_minutes <= allowed:
