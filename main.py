@@ -113,7 +113,7 @@ async def go_away(update, context, kind, label, mins):
     current_away = data[day][uid].get("away")
     if current_away is not None:
         await update.message.reply_text(
-            f"⚠️ 你当前正在「{current_away['label']}」状态。\\n"
+            f"⚠️ 你当前正在「{current_away['label']}」状态。\n"
             "请先点击 回坐/back。",
             reply_markup=keyboard
         )
