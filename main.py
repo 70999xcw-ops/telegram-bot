@@ -70,7 +70,10 @@ def init_user(data, day, uid, name):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 打卡机器人已启动\n请点击下面按钮操作\n\n发送 /id 获取群ID",
+        "🤖 打卡机器人已启动\n"
+        "📌 首次使用请点击 /start 显示菜单。\n"
+        "以后无需重复点击 /start。\n\n"
+        "发送 /id 获取群ID",
         reply_markup=keyboard
     )
 
@@ -105,6 +108,16 @@ async def go_away(update, context, kind, label, mins):
     now = now_time()
 
     init_user(data, day, uid, name)
+
+    # Đang ở ngoài thì không cho chọn trạng thái khác
+    current_away = data[day][uid].get("away")
+    if current_away is not None:
+        await update.message.reply_text(
+            f"⚠️ 你当前正在「{current_away['label']}」状态。
+请先点击 回坐/back。",
+            reply_markup=keyboard
+        )
+        return
 
     data[day][uid][kind] += mins
     data[day][uid]["away"] = {
@@ -179,6 +192,21 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=group_id, text=msg)
 
 
+
+def find_open_work_record(data, uid):
+    for d in sorted(data.keys(), reverse=True):
+        u = data.get(d, {}).get(uid)
+        if u and u.get("on") and not u.get("off"):
+            return d, u["on"]
+    return None, None
+
+def find_open_away_record(data, uid):
+    for d in sorted(data.keys(), reverse=True):
+        u = data.get(d, {}).get(uid)
+        if u and u.get("away"):
+            return d, u["away"]
+    return None, None
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     data = load_data()
@@ -205,11 +233,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         on_time_str = data.get(day, {}).get(uid, {}).get("on")
     
         if not on_time_str:
-            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    
-            if uid in data.get(yesterday, {}) and data[yesterday][uid].get("on") and not data[yesterday][uid].get("off"):
-                work_day = yesterday
-                on_time_str = data[work_day][uid].get("on")
+            work_day, on_time_str = find_open_work_record(data, uid)
     
         if not on_time_str:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
@@ -255,12 +279,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         away = data[day][uid].get("away")
 
         if away is None:
-            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-            if uid in data.get(yesterday, {}):
-                old_away = data[yesterday][uid].get("away")
-                if old_away:
-                    work_day = yesterday
-                    away = old_away
+            work_day, away = find_open_away_record(data, uid)
+            if work_day is None:
+                work_day = day
 
         data[work_day][uid]["back"] += 1
 
