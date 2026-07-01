@@ -96,7 +96,7 @@ async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=context.job.chat_id,
-        text=f"⚠️ {name} 已超时，请尽快回坐。"
+        text=f"🚨⚠️ {name} 已超时，请尽快回坐。❗❗❗"
     )
 
 
