@@ -16,11 +16,16 @@ GROUP_IDS = [
     -5424509783,
 ]
 
+ADMIN_IDS = [
+    "6607594162"
+]
+
 keyboard = ReplyKeyboardMarkup(
     [
         ["上班/on", "下班/off", "吃饭/meal"],
         ["上厕所/wc", "抽烟/smoke", "其他"],
-        ["回坐/back", "统计/report"]
+        ["回坐/back", "统计/report", "月统计/month"],
+        ["管理员后台/admin"]
     ],
     resize_keyboard=True
 )
@@ -218,6 +223,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init_user(data, day, uid, name)
 
     if text == "上班/on":
+        on_time = data[day][uid].get("on")
+        if on_time and not data[day][uid].get("off"):
+            await update.message.reply_text(
+                "⚠️ 你已经上班，不需要重复打卡。",
+                reply_markup=keyboard
+            )
+            return
+
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         save_data(data)
@@ -231,7 +244,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "下班/off":
         work_day = day
         on_time_str = data.get(day, {}).get(uid, {}).get("on")
-    
+
+        if data.get(work_day, {}).get(uid, {}).get("off"):
+            await update.message.reply_text(
+                "⚠️ 今天已经下班，无需重复打卡。",
+                reply_markup=keyboard
+            )
+            return
+
         if not on_time_str:
             work_day, on_time_str = find_open_work_record(data, uid)
     
@@ -333,7 +353,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif text == "统计/report":
-        user_data = data[day][uid]
+        report_day = day
+        if not data.get(day, {}).get(uid, {}).get("on"):
+            d,on=find_open_work_record(data, uid)
+            if d:
+                report_day=d
+        user_data = data.get(report_day, {}).get(uid, data[day][uid])
 
         on_text = "未打卡"
         off_text = "未打卡"
@@ -362,8 +387,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
+    elif text == "月统计/month":
 
+        await update.message.reply_text(
+            "🚧 月统计 đang phát triển",
+            reply_markup=keyboard
+        )
 
+    elif text == "管理员后台/admin":
+
+        if uid not in ADMIN_IDS:
+            await update.message.reply_text(
+                "❌ 无权限",
+                reply_markup=keyboard
+            )
+            return
+
+        admin_keyboard = ReplyKeyboardMarkup(
+            [
+                ["今日在线", "未下班"],
+                ["今日统计", "工时排行"],
+                ["全员月统计"],
+                ["返回"]
+            ],
+            resize_keyboard=True
+        )
+
+        await update.message.reply_text(
+            "👑 管理后台",
+            reply_markup=admin_keyboard
+        )
 
 if not TOKEN:
     raise RuntimeError("BOT_TOKEN environment variable is not set")
@@ -376,7 +429,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日在线|未下班|今日统计|工时排行|全员月统计|返回)$"
         ),
         handle_message
     )
