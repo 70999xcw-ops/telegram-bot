@@ -15,11 +15,9 @@ GROUP_IDS = [
     -1003937059366,
     -5424509783,
 ]
-
 ADMIN_IDS = [
     "6607594162"
 ]
-
 keyboard = ReplyKeyboardMarkup(
     [
         ["上班/on", "下班/off", "吃饭/meal"],
@@ -43,7 +41,7 @@ def load_data():
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         return {}
 
 
@@ -67,7 +65,6 @@ def init_user(data, day, uid, name):
         "toilet": 0,
         "smoke": 0,
         "other": 0,
-        "other_count": 0,
         "back": 0,
         "away": None
     })
@@ -75,10 +72,7 @@ def init_user(data, day, uid, name):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 打卡机器人已启动\n"
-        "📌 首次使用请点击 /start 显示菜单。\n"
-        "以后无需重复点击 /start。\n\n"
-        "发送 /id 获取群ID",
+        "🤖 打卡机器人已启动\n请点击下面按钮操作\n\n发送 /id 获取群ID",
         reply_markup=keyboard
     )
 
@@ -96,12 +90,12 @@ async def timeout_notice(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     away = data.get(day, {}).get(uid, {}).get("away")
 
-    if away is None:
+    if not away:
         return
 
     await context.bot.send_message(
         chat_id=context.job.chat_id,
-        text=f"🚨⚠️ {name} 已超时，请尽快回坐。❗❗❗"
+        text=f"⚠️ {name} 已超时，请尽快回坐。"
     )
 
 
@@ -113,16 +107,6 @@ async def go_away(update, context, kind, label, mins):
     now = now_time()
 
     init_user(data, day, uid, name)
-
-    # Đang ở ngoài thì không cho chọn trạng thái khác
-    current_away = data[day][uid].get("away")
-    if current_away is not None:
-        await update.message.reply_text(
-            f"⚠️ 你当前正在「{current_away['label']}」状态。\n"
-            "请先点击 回坐/back。",
-            reply_markup=keyboard
-        )
-        return
 
     data[day][uid][kind] += mins
     data[day][uid]["away"] = {
@@ -160,60 +144,56 @@ async def go_away(update, context, kind, label, mins):
 async def daily_report(context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     day = today_key()
+    now = now_time()
+    
+    report_items = []
 
-    if day not in data or not data[day]:
+    # 今天完成下班的所有记录（包括跨天夜班）
+    for d, day_data in data.items():
+        for user_data in day_data.values():
+            if user_data.get("on") and user_data.get("off"):
+                off_dt = datetime.fromisoformat(user_data["off"])
+                if off_dt.strftime("%Y-%m-%d") == day:
+                    report_items.append(user_data)
+
+    if not report_items:
         msg = f"📊 每日考勤统计 {day}\n\n暂无数据"
     else:
         msg = f"📊 每日考勤统计 {day}（北京时间）\n\n"
 
-        for user_data in data[day].values():
+        for user_data in report_items:
             on_text = "未打卡"
             off_text = "未打卡"
             work_text = "未计算"
 
             if user_data.get("on"):
                 on_dt = datetime.fromisoformat(user_data["on"])
-                on_text = on_dt.strftime("%H:%M:%S")
+                on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
 
                 if user_data.get("off"):
                     off_dt = datetime.fromisoformat(user_data["off"])
-                    off_text = off_dt.strftime("%H:%M:%S")
+                    off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
                     work_minutes = int((off_dt - on_dt).total_seconds() // 60)
                     work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
 
             msg += (
-    f"👤 {user_data.get('name', '用户')}\n"
-    f"🕘 上班：{on_text}\n"
-    f"🕕 下班：{off_text}\n"
-    f"🕒 工时：{work_text}\n"
-    f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
-    f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-    f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-    f"📌 其他：{user_data.get('other', 0)}分钟\n"
-    f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
+                f"👤 {user_data.get('name', '用户')}\n"
+                f"🕘 上班：{on_text}\n"
+                f"🕕 下班：{off_text}\n"
+                f"🕒 工时：{work_text}\n"
+                f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
+                f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
+                f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+                f"📌 其他：{user_data.get('other', 0)}分钟\n"
+                f"🔄 回坐：{user_data.get('back', 0)}次\n\n"
             )
 
-    for group_id in GROUP_IDS:
-        await context.bot.send_message(chat_id=group_id, text=msg)
-
-
-
-def find_open_work_record(data, uid):
-    for d in sorted(data.keys(), reverse=True):
-        u = data.get(d, {}).get(uid)
-        if u and u.get("on") and not u.get("off"):
-            return d, u["on"]
-    return None, None
-
-def find_open_away_record(data, uid):
-    for d in sorted(data.keys(), reverse=True):
-        u = data.get(d, {}).get(uid)
-        if u and u.get("away"):
-            return d, u["away"]
-    return None, None
+        for group_id in GROUP_IDS:
+            await context.bot.send_message(chat_id=group_id, text=msg)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    print(repr(text))
     data = load_data()
     day = today_key()
     uid = str(update.effective_user.id)
@@ -223,14 +203,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init_user(data, day, uid, name)
 
     if text == "上班/on":
-        on_time = data[day][uid].get("on")
-        if on_time and not data[day][uid].get("off"):
-            await update.message.reply_text(
-                "⚠️ 你已经上班，不需要重复打卡。",
-                reply_markup=keyboard
-            )
-            return
-
         data[day][uid]["on"] = now.isoformat()
         data[day][uid]["off"] = None
         save_data(data)
@@ -244,16 +216,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "下班/off":
         work_day = day
         on_time_str = data.get(day, {}).get(uid, {}).get("on")
-
-        if data.get(work_day, {}).get(uid, {}).get("off"):
-            await update.message.reply_text(
-                "⚠️ 今天已经下班，无需重复打卡。",
-                reply_markup=keyboard
-            )
-            return
-
+    
         if not on_time_str:
-            work_day, on_time_str = find_open_work_record(data, uid)
+            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+            if uid in data.get(yesterday, {}) and data[yesterday][uid].get("on") and not data[yesterday][uid].get("off"):
+                work_day = yesterday
+                on_time_str = data[work_day][uid].get("on")
     
         if not on_time_str:
             await update.message.reply_text("❌ 请先上班打卡", reply_markup=keyboard)
@@ -276,47 +245,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await go_away(update, context, "meal", "吃饭", 30)
 
     elif text == "上厕所/wc":
-        await go_away(update, context, "toilet", "上厕所", 15)
+        await go_away(update, context, "toilet", "上厕所", 10)
 
     elif text == "抽烟/smoke":
-        await go_away(update, context, "smoke", "抽烟", 15)
+        await go_away(update, context, "smoke", "抽烟", 10)
 
     elif text == "其他":
-        if data[day][uid].get("other_count", 0) >= 2:
-            await update.message.reply_text(
-                "❌ 今天『其他』只能使用2次。",
-                reply_markup=keyboard
-            )
-            return
-
-        data[day][uid]["other_count"] += 1
-        save_data(data)
-
-        await go_away(update, context, "other", "其他", 20)
+        await go_away(update, context, "other", "其他", 10)
 
     elif text == "回坐/back":
-        work_day = day
         away = data[day][uid].get("away")
-
-        if away is None:
-            work_day, away = find_open_away_record(data, uid)
-            if work_day is None:
-                work_day = day
-
-        data[work_day][uid]["back"] += 1
+        data[day][uid]["back"] += 1
 
         for job in context.job_queue.get_jobs_by_name(f"timeout_{uid}"):
             job.schedule_removal()
 
-        if away is None:
+        if not away:
             save_data(data)
             await update.message.reply_text(
-                "❌ 未找到离开记录\n\n"
-                "请先点击：\n"
-                "🍚 吃饭/meal\n"
-                "🚽 上厕所/wc\n"
-                "🚬 抽烟/smoke\n"
-                "📌 其他",
+                f"✅ 回坐成功\n"
+                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
                 reply_markup=keyboard
             )
             return
@@ -325,101 +273,385 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         actual_minutes = int((now - start).total_seconds() // 60)
         allowed = away.get("mins", 0)
 
-        data[work_day][uid]["away"] = None
+        data[day][uid]["away"] = None
         save_data(data)
 
-        if actual_minutes <= allowed:
-            msg = (
-                "✅ 准时回坐\n\n"
-                f"👤 {name}\n"
-                f"📌 类型：{away['label']}\n"
-                f"⏱ 实际离开：{actual_minutes}分钟\n"
-                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-        else:
-            overtime = actual_minutes - allowed
-            msg = (
-                "⚠️ 超时回坐\n\n"
-                f"👤 {name}\n"
-                f"📌 类型：{away['label']}\n"
-                f"⏱ 实际离开：{actual_minutes}分钟\n"
-                f"⌛ 超时：{overtime}分钟\n"
-                f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
+        result = "✅ 准时回坐" if actual_minutes <= allowed else f"⚠️ 超时 {actual_minutes - allowed} 分钟"
 
         await update.message.reply_text(
-            msg,
+            f"{result}\n"
+            f"📌 类型：{away['label']}\n"
+            f"⏱ 实际离开：{actual_minutes}分钟\n"
+            f"🕒 回坐时间：{now.strftime('%Y-%m-%d %H:%M:%S')}",
             reply_markup=keyboard
         )
 
     elif text == "统计/report":
         report_day = day
-        if not data.get(day, {}).get(uid, {}).get("on"):
-            d,on=find_open_work_record(data, uid)
-            if d:
-                report_day=d
-        user_data = data.get(report_day, {}).get(uid, data[day][uid])
-
+        user_data = data[day][uid]
+    
+        # 如果今天没有上班记录，就查昨天夜班记录
+        if not user_data.get("on"):
+            yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+            if uid in data.get(yesterday, {}) and data[yesterday][uid].get("on"):
+                report_day = yesterday
+                user_data = data[yesterday][uid]
+    
         on_text = "未打卡"
         off_text = "未打卡"
         work_text = "未计算"
-
+    
         if user_data.get("on"):
             on_dt = datetime.fromisoformat(user_data["on"])
             on_text = on_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-        if user_data.get("off"):
-            off_dt = datetime.fromisoformat(user_data["off"])
-            off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
-            work_minutes = int((off_dt - on_dt).total_seconds() // 60)
-            work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
-
+    
+            if user_data.get("off"):
+                off_dt = datetime.fromisoformat(user_data["off"])
+                off_text = off_dt.strftime("%Y-%m-%d %H:%M:%S")
+                work_minutes = int((off_dt - on_dt).total_seconds() // 60)
+                work_text = f"{work_minutes // 60}小时{work_minutes % 60}分钟"
+            else:
+                work_minutes = int((now - on_dt).total_seconds() // 60)
+                work_text = f"进行中，已上班 {work_minutes // 60}小时{work_minutes % 60}分钟"
+    
         await update.message.reply_text(
-            f"📊 今日统计\n\n"
+            f"📊 统计 {report_day}\n\n"
             f"👤 姓名：{user_data.get('name', name)}\n"
             f"🕘 上班：{on_text}\n"
             f"🕕 下班：{off_text}\n"
             f"🕒 工时：{work_text}\n\n"
             f"🍚 吃饭：{user_data.get('meal', 0)}分钟\n"
             f"🚽 厕所：{user_data.get('toilet', 0)}分钟\n"
-                        f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
-            f"📌 其他：{user_data.get('other', 0)}分钟（{user_data.get('other_count',0)}/2次）\n"
+            f"🚬 抽烟：{user_data.get('smoke', 0)}分钟\n"
+            f"📌 其他：{user_data.get('other', 0)}分钟\n"
             f"🔄 回坐：{user_data.get('back', 0)}次",
             reply_markup=keyboard
         )
+    
     elif text == "月统计/month":
-
-        await update.message.reply_text(
-            "🚧 月统计 đang phát triển",
-            reply_markup=keyboard
-        )
+        month = now.strftime("%Y-%m")
+        is_admin = str(uid) in ADMIN_IDS
+    
+        total_days = 0
+        total_work = 0
+        total_meal = 0
+        total_toilet = 0
+        total_smoke = 0
+        total_other = 0
+        total_back = 0
+    
+        users_result = {}
+    
+        for d, day_data in data.items():
+            if not d.startswith(month):
+                continue
+    
+            for user_id, user_data in day_data.items():
+                if not is_admin and user_id != uid:
+                    continue
+    
+                name2 = user_data.get("name", "用户")
+    
+                if name2 not in users_result:
+                    users_result[name2] = {
+                        "days": 0,
+                        "work": 0,
+                        "meal": 0,
+                        "toilet": 0,
+                        "smoke": 0,
+                        "other": 0,
+                        "back": 0
+                    }
+    
+                if user_data.get("on"):
+                    users_result[name2]["days"] += 1
+    
+                if user_data.get("on") and user_data.get("off"):
+                    on_dt = datetime.fromisoformat(user_data["on"])
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    mins = int((off_dt - on_dt).total_seconds() // 60)
+                    users_result[name2]["work"] += mins
+    
+                users_result[name2]["meal"] += user_data.get("meal", 0)
+                users_result[name2]["toilet"] += user_data.get("toilet", 0)
+                users_result[name2]["smoke"] += user_data.get("smoke", 0)
+                users_result[name2]["other"] += user_data.get("other", 0)
+                users_result[name2]["back"] += user_data.get("back", 0)
+    
+        if not users_result:
+            await update.message.reply_text("📊 本月暂无统计数据", reply_markup=keyboard)
+            return
+    
+        msg = f"📊 月统计 {month}\n\n"
+    
+        for n, s in users_result.items():
+            work = s["work"]
+            away = s["meal"] + s["toilet"] + s["smoke"] + s["other"]
+            real_work = max(work - away, 0)
+    
+            msg += (
+                f"👤 {n}\n"
+                f"📅 出勤：{s['days']}天\n"
+                f"🕒 总工时：{work // 60}小时{work % 60}分钟\n"
+                f"✅ 实际工时：{real_work // 60}小时{real_work % 60}分钟\n"
+                f"🍚 吃饭：{s['meal']}分钟\n"
+                f"🚽 厕所：{s['toilet']}分钟\n"
+                f"🚬 抽烟：{s['smoke']}分钟\n"
+                f"📌 其他：{s['other']}分钟\n"
+                f"🔄 回坐：{s['back']}次\n\n"
+            )
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
 
     elif text == "管理员后台/admin":
-
-        if uid not in ADMIN_IDS:
-            await update.message.reply_text(
-                "❌ 无权限",
-                reply_markup=keyboard
-            )
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员，不能使用后台。", reply_markup=keyboard)
             return
 
-        admin_keyboard = ReplyKeyboardMarkup(
-            [
-                ["今日在线", "未下班"],
-                ["今日统计", "工时排行"],
-                ["全员月统计"],
-                ["返回"]
-            ],
-            resize_keyboard=True
-        )
+        today_data = data.get(day, {})
+    
+        online_count = 0
+        off_count = 0
+        night_count = 0
+        day_count = 0
+    
+        for user_data in today_data.values():
+            if user_data.get("on"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+
+                if on_dt.hour >= 17:
+                    night_count += 1
+                else:
+                    day_count += 1
+
+                if user_data.get("off"):
+                    off_count += 1
+                else:
+                    online_count += 1
 
         await update.message.reply_text(
-            "👑 管理后台",
-            reply_markup=admin_keyboard
+            f"👑 管理后台\n\n"
+            f"👥 今日在线：{online_count}人\n"
+            f"✅ 今日下班：{off_count}人\n"
+            f"🔴 未下班：{online_count}人\n"
+            f"🌙 夜班：{night_count}人\n"
+            f"☀️ 白班：{day_count}人\n\n"
+            f"👇 点击下面功能\n\n"
+            f"📋 今日考勤：admin_today\n"
+            f"👥 今日在线：admin_online\n"
+            f"🔴 未下班：admin_unoff\n"
+            f"📅 全员月统计：admin_month\n"
+            f"🏆 工时排行：admin_rank",
+            reply_markup=keyboard
         )
+                            
+    elif text == "今日考勤/admin_today":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        today = day
+        today_data = {}
+        
+        for d, day_data in data.items():
+            for user_id, user_data in day_data.items():
+                if user_data.get("off"):
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    if off_dt.strftime("%Y-%m-%d") == today:
+                        today_data[user_id] = user_data
+    
+        if not today_data:
+            await update.message.reply_text("📋 今日暂无考勤记录", reply_markup=keyboard)
+            return
+    
+        msg = f"📋 今日考勤 {today}\n\n"
+    
+        for user_id, user_data in today_data.items():
+            n = user_data.get("name", "用户")
+    
+            if user_data.get("on") and user_data.get("off"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                off_dt = datetime.fromisoformat(user_data["off"])
+                msg += f"✅ {n}\n上班：{on_dt.strftime('%H:%M:%S')}\n下班：{off_dt.strftime('%H:%M:%S')}\n\n"
+    
+            elif user_data.get("on") and not user_data.get("off"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                msg += f"🟢 {n}\n上班：{on_dt.strftime('%H:%M:%S')}\n状态：未下班\n\n"
+    
+            else:
+                msg += f"🔴 {n}\n状态：未打卡\n\n"
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
 
-if not TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable is not set")
+    elif text == "今日在线/admin_online":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        today = day
+        today_data = data.get(today, {})
+    
+        online_users = []
+    
+        for user_id, user_data in today_data.items():
+            if user_data.get("on") and not user_data.get("off"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                work_minutes = int((now - on_dt).total_seconds() // 60)
+                online_users.append(
+                    f"🟢 {user_data.get('name', '用户')}\n"
+                    f"🕘 上班：{on_dt.strftime('%H:%M:%S')}\n"
+                    f"⏱ 已工作：{work_minutes // 60}小时{work_minutes % 60}分钟"
+                )
+    
+        if not online_users:
+            await update.message.reply_text("👥 当前没有在线员工。", reply_markup=keyboard)
+            return
+    
+        msg = "👥 今日在线\n\n" + "\n\n".join(online_users)
+
+        await update.message.reply_text(msg, reply_markup=keyboard)
+
+    elif text == "工时排行/admin_rank":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        month = now.strftime("%Y-%m")
+        ranks = {}
+    
+        for d, day_data in data.items():
+            if not d.startswith(month):
+                continue
+        
+            for user_id, user_data in day_data.items():
+                n = user_data.get("name", "用户")
+    
+                if n not in ranks:
+                    ranks[n] = 0
+    
+                if user_data.get("on") and user_data.get("off"):
+                    on_dt = datetime.fromisoformat(user_data["on"])
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    mins = int((off_dt - on_dt).total_seconds() // 60)
+    
+                    away = (
+                        user_data.get("meal", 0)
+                        + user_data.get("toilet", 0)
+                        + user_data.get("smoke", 0)
+                        + user_data.get("other", 0)
+                    )
+    
+                    ranks[n] += max(mins - away, 0)
+    
+        if not ranks:
+            await update.message.reply_text("🏆 本月暂无排行数据。", reply_markup=keyboard)
+            return
+    
+        sorted_ranks = sorted(ranks.items(), key=lambda x: x[1], reverse=True)
+    
+        msg = f"🏆 工时排行 {month}\n\n"
+    
+        medals = ["🥇", "🥈", "🥉"]
+    
+        for i, (n, mins) in enumerate(sorted_ranks, start=1):
+            icon = medals[i - 1] if i <= 3 else f"{i}."
+            msg += f"{icon} {n}：{mins // 60}小时{mins % 60}分钟\n"
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
+    
+    elif text == "未下班/admin_unoff":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        today_data = data.get(day, {})
+        unoff_users = []
+    
+        for user_id, user_data in today_data.items():
+            if user_data.get("on") and not user_data.get("off"):
+                on_dt = datetime.fromisoformat(user_data["on"])
+                work_minutes = int((now - on_dt).total_seconds() // 60)
+    
+                unoff_users.append(
+                    f"🔴 {user_data.get('name', '用户')}\n"
+                    f"🕘 上班：{on_dt.strftime('%H:%M:%S')}\n"
+                    f"⏱ 已工作：{work_minutes // 60}小时{work_minutes % 60}分钟"
+                )
+    
+        if not unoff_users:
+            await update.message.reply_text("✅ 目前没有未下班员工。", reply_markup=keyboard)
+            return
+    
+        msg = "🔴 未下班员工\n\n" + "\n\n".join(unoff_users)
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
+
+    elif text == "全员月统计/admin_month":
+        if str(uid) not in ADMIN_IDS:
+            await update.message.reply_text("❌ 你不是管理员。", reply_markup=keyboard)
+            return
+    
+        month = now.strftime("%Y-%m")
+        users_result = {}
+    
+        for d, day_data in data.items():
+            if not d.startswith(month):
+                continue
+    
+            for user_id, user_data in day_data.items():
+                n = user_data.get("name", "用户")
+    
+                if n not in users_result:
+                    users_result[n] = {
+                        "days": 0,
+                        "work": 0,
+                        "meal": 0,
+                        "toilet": 0,
+                        "smoke": 0,
+                        "other": 0,
+                        "back": 0
+                    }
+    
+                if user_data.get("on"):
+                    users_result[n]["days"] += 1
+    
+                if user_data.get("on") and user_data.get("off"):
+                    on_dt = datetime.fromisoformat(user_data["on"])
+                    off_dt = datetime.fromisoformat(user_data["off"])
+                    mins = int((off_dt - on_dt).total_seconds() // 60)
+                    users_result[n]["work"] += mins
+    
+                users_result[n]["meal"] += user_data.get("meal", 0)
+                users_result[n]["toilet"] += user_data.get("toilet", 0)
+                users_result[n]["smoke"] += user_data.get("smoke", 0)
+                users_result[n]["other"] += user_data.get("other", 0)
+                users_result[n]["back"] += user_data.get("back", 0)
+    
+        if not users_result:
+            await update.message.reply_text("📅 本月暂无全员统计数据。", reply_markup=keyboard)
+            return
+    
+        msg = f"📅 全员月统计 {month}\n\n"
+    
+        for n, s in users_result.items():
+            work = s["work"]
+            away = s["meal"] + s["toilet"] + s["smoke"] + s["other"]
+            real_work = max(work - away, 0)
+    
+            msg += (
+                f"👤 {n}\n"
+                f"📅 出勤：{s['days']}天\n"
+                f"⏰ 总工时：{work // 60}小时{work % 60}分钟\n"
+                f"✅ 实际工时：{real_work // 60}小时{real_work % 60}分钟\n"
+                f"🍚 吃饭：{s['meal']}分钟\n"
+                f"🚽 厕所：{s['toilet']}分钟\n"
+                f"🚬 抽烟：{s['smoke']}分钟\n"
+                f"📌 其他：{s['other']}分钟\n"
+                f"🔄 回坐：{s['back']}次\n\n"
+            )
+    
+        await update.message.reply_text(msg, reply_markup=keyboard)
 
 app = Application.builder().token(TOKEN).build()
 
@@ -429,7 +661,7 @@ app.add_handler(CommandHandler("id", get_id))
 app.add_handler(
     MessageHandler(
         filters.Regex(
-            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日在线|未下班|今日统计|工时排行|全员月统计|返回)$"
+            r"^(上班/on|下班/off|吃饭/meal|上厕所/wc|抽烟/smoke|其他|回坐/back|统计/report|月统计/month|管理员后台/admin|今日考勤/admin_today|今日在线/admin_online|未下班/admin_unoff|工时排行/admin_rank|全员月统计/admin_month)$"
         ),
         handle_message
     )
@@ -444,4 +676,3 @@ app.job_queue.run_daily(
 print("Bot started OK")
 
 app.run_polling()
-# redeploy
